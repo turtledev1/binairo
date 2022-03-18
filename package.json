@@ -1,0 +1,24 @@
+{
+  "name": "binairo",
+  "version": "1.0.0",
+  "description": "Binairo generator and solver",
+  "main": "index.js",
+  "scripts": {
+    "start": "node build/index.js",
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "turtledev1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/turtledev1/math-stat"
+  },
+  "bugs": {
+    "url": "https://github.com/turtledev1/math-stat/issues"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^4.6.2"
+  }
+}
