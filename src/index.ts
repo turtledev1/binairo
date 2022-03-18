@@ -1,6 +1,6 @@
-import { generate } from "./generator"
+import { generate, generateWithIteration } from "./generator"
 
-const board = generate();
+const board = generateWithIteration();
 console.log('Binairo board');
-// console.log(board.toString());
+console.log(board.toString());
 console.log(board.isValid() ? 'Valid' : 'Invalid');

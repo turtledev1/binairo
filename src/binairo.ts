@@ -10,9 +10,9 @@ export class Binairo {
     }
 
     public toString(): string {
-        let value = '';
+        let value = '    0   1   2   3   4   5   6   7   8   9\n';
         for (let i = 0; i < 10; i++) {
-            value += '| ';
+            value += i + ' | ';
             this.getRow(i).forEach((num, index) => {
                 value += num ? '1' : '0';
                 if (index < 9) {
@@ -49,11 +49,11 @@ export class Binairo {
     public isValid(): boolean {
         for (let i = 0; i < 10; i++) {
             if (this.getNumberOfSameValue(this.getRow(i)) !== 5) {
-                console.log(`Row ${i} has ${this.getNumberOfSameValue(this.getRow(i))} same values`);
+                // console.log(`Row ${i} has ${this.getNumberOfSameValue(this.getRow(i))} same values`);
                 return false;
             }
             if (this.getNumberOfSameValue(this.getColumn(i)) !== 5) {
-                console.log(`Column ${i} has ${this.getNumberOfSameValue(this.getColumn(i))} same values`);
+                // console.log(`Column ${i} has ${this.getNumberOfSameValue(this.getColumn(i))} same values`);
                 return false;
             }
         }
