@@ -1,49 +1,62 @@
-import { Binairo } from "./binairo";
+import { Binairo } from './binairo';
 
-export class BinairoRowVisitor {
+export class BinairoBoardGenerator {
     constructor() { }
 
-    public visit(binairo: Binairo, rowIndex: number) {
-        this.visitLastResort(binairo, rowIndex, 0);
-        this.visitLastResort(binairo, rowIndex, 1);
+    public generate() {
+        const binairo = new Binairo();
+
+        this.generateRow(binairo, 0);
+        this.generateRow(binairo, 1);
+
+        for (let rowIndex = 2; rowIndex < 10; rowIndex++) {
+            this.generateRowWithColumnAwareness(binairo, rowIndex);
+        }
+
+        return binairo;
+    }
+
+    private generateRow(binairo: Binairo, rowIndex: number) {
+        this.checkLastResort(binairo, rowIndex, 0);
+        this.checkLastResort(binairo, rowIndex, 1);
 
         for (let columnIndex = 2; columnIndex < 10; columnIndex++) {
-            this.visitRowForPrioritization(binairo, rowIndex, columnIndex);
-            this.visitPreviousTwoValues(binairo, rowIndex, columnIndex);
-            this.visitRowForMax(binairo, rowIndex, columnIndex);
-            this.visitLastResort(binairo, rowIndex, columnIndex);
+            this.checkRowForPrioritization(binairo, rowIndex, columnIndex);
+            this.checkPreviousTwoValues(binairo, rowIndex, columnIndex);
+            this.checkRowForMax(binairo, rowIndex, columnIndex);
+            this.checkLastResort(binairo, rowIndex, columnIndex);
         }
     }
 
-    public visitWithColumnAwareness(binairo: Binairo, rowIndex: number) {
-        this.visitColumnForPrioritization(binairo, rowIndex, 0);
-        this.visitTopTwoValues(binairo, rowIndex, 0);
-        this.visitColumnForMax(binairo, rowIndex, 0);
-        this.visitLastResort(binairo, rowIndex, 0);
+    private generateRowWithColumnAwareness(binairo: Binairo, rowIndex: number) {
+        this.checkColumnForPrioritization(binairo, rowIndex, 0);
+        this.checkTopTwoValues(binairo, rowIndex, 0);
+        this.checkColumnForMax(binairo, rowIndex, 0);
+        this.checkLastResort(binairo, rowIndex, 0);
 
-        this.visitColumnForPrioritization(binairo, rowIndex, 1);
-        this.visitTopTwoValues(binairo, rowIndex, 1);
-        this.visitColumnForMax(binairo, rowIndex, 1);
-        this.visitLastResort(binairo, rowIndex, 1);
+        this.checkColumnForPrioritization(binairo, rowIndex, 1);
+        this.checkTopTwoValues(binairo, rowIndex, 1);
+        this.checkColumnForMax(binairo, rowIndex, 1);
+        this.checkLastResort(binairo, rowIndex, 1);
 
         for (let columnIndex = 2; columnIndex < 10; columnIndex++) {
-            this.visitRowForPrioritization(binairo, rowIndex, columnIndex);
-            this.visitColumnForPrioritization(binairo, rowIndex, columnIndex);
-            this.visitTopTwoValues(binairo, rowIndex, columnIndex);
-            this.visitColumnForMax(binairo, rowIndex, columnIndex);
-            this.visitPreviousTwoValues(binairo, rowIndex, columnIndex);
-            this.visitRowForMax(binairo, rowIndex, columnIndex);
-            this.visitLastResort(binairo, rowIndex, columnIndex);
+            this.checkRowForPrioritization(binairo, rowIndex, columnIndex);
+            this.checkColumnForPrioritization(binairo, rowIndex, columnIndex);
+            this.checkTopTwoValues(binairo, rowIndex, columnIndex);
+            this.checkColumnForMax(binairo, rowIndex, columnIndex);
+            this.checkPreviousTwoValues(binairo, rowIndex, columnIndex);
+            this.checkRowForMax(binairo, rowIndex, columnIndex);
+            this.checkLastResort(binairo, rowIndex, columnIndex);
         }
     }
 
-    private visitPreviousTwoValues(binairo: Binairo, rowIndex: number, columnIndex: number) {
+    private checkPreviousTwoValues(binairo: Binairo, rowIndex: number, columnIndex: number) {
         if (this.areTwoNumbersBeforeSame(binairo, rowIndex, columnIndex)) {
             binairo.setValue(rowIndex, columnIndex, !binairo.getValue(rowIndex, columnIndex - 1));
         }
     }
 
-    private visitRowForMax(binairo: Binairo, rowIndex: number, columnIndex: number) {
+    private checkRowForMax(binairo: Binairo, rowIndex: number, columnIndex: number) {
         if (this.isMaxReachedForRow(binairo, rowIndex, columnIndex, true)) {
             binairo.setValue(rowIndex, columnIndex, false);
         }
@@ -52,7 +65,7 @@ export class BinairoRowVisitor {
         }
     }
 
-    private visitColumnForMax(binairo: Binairo, rowIndex: number, columnIndex: number) {
+    private checkColumnForMax(binairo: Binairo, rowIndex: number, columnIndex: number) {
         if (this.isMaxReachedForColumn(binairo, rowIndex, columnIndex, true)) {
             binairo.setValue(rowIndex, columnIndex, false);
         }
@@ -61,13 +74,13 @@ export class BinairoRowVisitor {
         }
     }
 
-    private visitTopTwoValues(binairo: Binairo, rowIndex: number, columnIndex: number) {
+    private checkTopTwoValues(binairo: Binairo, rowIndex: number, columnIndex: number) {
         if (this.areTwoNumbersAboveSame(binairo, rowIndex, columnIndex)) {
             binairo.setValue(rowIndex, columnIndex, !binairo.getValue(rowIndex - 1, columnIndex));
         }
     }
 
-    private visitRowForPrioritization(binairo: Binairo, rowIndex: number, columnIndex: number) {
+    private checkRowForPrioritization(binairo: Binairo, rowIndex: number, columnIndex: number) {
         const isColumn4Or5 = columnIndex === 4 || columnIndex === 5;
         if (isColumn4Or5 && this.getSumForValue(binairo.getRow(rowIndex), columnIndex, false)) {
             binairo.setValue(rowIndex, columnIndex, true);
@@ -77,7 +90,7 @@ export class BinairoRowVisitor {
         }
     }
 
-    private visitColumnForPrioritization(binairo: Binairo, rowIndex: number, columnIndex: number) {
+    private checkColumnForPrioritization(binairo: Binairo, rowIndex: number, columnIndex: number) {
         const isRow4Or5 = rowIndex === 4 || rowIndex === 5;
         if (isRow4Or5 && this.getSumForValue(binairo.getColumn(columnIndex), rowIndex, false)) {
             binairo.setValue(rowIndex, columnIndex, true);
@@ -87,7 +100,7 @@ export class BinairoRowVisitor {
         }
     }
 
-    private visitLastResort(binairo: Binairo, rowIndex: number, columnIndex: number) {
+    private checkLastResort(binairo: Binairo, rowIndex: number, columnIndex: number) {
         if (binairo.getValue(rowIndex, columnIndex) === undefined) {
             binairo.setValue(rowIndex, columnIndex, this.randomBoolean());
         }
