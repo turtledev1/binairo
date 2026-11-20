@@ -86,6 +86,29 @@ class _GameScreenState extends State<GameScreen> {
     }
   }
 
+  Future<void> _confirmRestart() async {
+    final shouldRestart = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Restart puzzle?'),
+        content: const Text('This clears all your moves.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Restart'),
+          ),
+        ],
+      ),
+    );
+    if (shouldRestart == true) {
+      _controller.restart();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final puzzle = _controller.puzzle;
@@ -105,7 +128,7 @@ class _GameScreenState extends State<GameScreen> {
             IconButton(
               tooltip: 'Restart',
               icon: const Icon(Icons.restart_alt),
-              onPressed: _controller.isSolved ? null : _controller.restart,
+              onPressed: _controller.canRestart ? _confirmRestart : null,
             ),
           ],
         ),

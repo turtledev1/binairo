@@ -1,5 +1,6 @@
 import 'package:binairo_app/game/saved_game_repository.dart';
 import 'package:binairo_app/screens/new_game_screen.dart';
+import 'package:binairo_app/widgets/board_cell.dart';
 import 'package:binairo_core/binairo_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -106,4 +107,85 @@ void main() {
       findsOneWidget,
     );
   });
+
+  Future<void> openGameAndPlayFirstCell(WidgetTester tester) async {
+    await tester.pumpWidget(buildApp());
+    await tester.tap(find.text('New game'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('cell-0-0')));
+    await tester.pump();
+  }
+
+  Finder digitInFirstCell(String digit) => find.descendant(
+    of: find.byKey(const ValueKey('cell-0-0')),
+    matching: find.text(digit),
+  );
+
+  testWidgets('cancelling the restart dialog keeps the moves', (tester) async {
+    await openGameAndPlayFirstCell(tester);
+
+    await tester.tap(find.byTooltip('Restart'));
+    await tester.pumpAndSettle();
+    expect(find.text('Restart puzzle?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(digitInFirstCell('0'), findsOneWidget);
+  });
+
+  testWidgets('confirming the restart dialog clears the moves', (tester) async {
+    await openGameAndPlayFirstCell(tester);
+
+    await tester.tap(find.byTooltip('Restart'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Restart'));
+    await tester.pumpAndSettle();
+
+    expect(digitInFirstCell('0'), findsNothing);
+  });
+
+  testWidgets(
+    'given cells and player cells holding the same digit look different',
+    (tester) async {
+      await openGameAndPlayFirstCell(tester);
+      Color backgroundOf(String cellKey) {
+        final tile = tester.widget<Container>(
+          find
+              .descendant(
+                of: find.byKey(ValueKey(cellKey)),
+                matching: find.byType(Container),
+              )
+              .last,
+        );
+        return (tile.decoration! as BoxDecoration).color!;
+      }
+
+      expect(backgroundOf('cell-0-0'), isNot(backgroundOf('cell-0-2')));
+    },
+  );
+
+  testWidgets(
+    'a cell that breaks a rule gets a ring in a color no digit uses',
+    (tester) async {
+      await openGameAndPlayFirstCell(tester);
+      await tester.tap(find.byKey(const ValueKey('cell-0-0')));
+      await tester.pump();
+
+      final ring = tester.widget<Container>(
+        find
+            .descendant(
+              of: find.byKey(const ValueKey('cell-0-0')),
+              matching: find.byType(Container),
+            )
+            .first,
+      );
+      final ringBorder = (ring.decoration! as BoxDecoration).border! as Border;
+
+      expect(ringBorder.top.color, BoardCell.violationColor);
+      expect(
+        BoardCell.violationColor,
+        isNot(anyOf(BoardCell.zeroColor, BoardCell.oneColor)),
+      );
+    },
+  );
 }

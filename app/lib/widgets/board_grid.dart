@@ -84,11 +84,10 @@ class _LineCounter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final errorColor = Theme.of(context).colorScheme.error;
     Text counterText(int valuesLeft, Color color) => Text(
       '$valuesLeft',
       style: TextStyle(
-        color: valuesLeft < 0 ? errorColor : color,
+        color: valuesLeft < 0 ? BoardCell.violationColor : color,
         fontWeight: FontWeight.bold,
       ),
     );

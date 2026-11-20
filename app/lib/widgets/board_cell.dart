@@ -12,6 +12,8 @@ class BoardCell extends StatelessWidget {
 
   static const Color zeroColor = Color(0xFFF4A259);
   static const Color oneColor = Color(0xFF3D7DD8);
+  static const Color violationColor = Color(0xFFFF1744);
+  static const double violationRingWidth = 2.5;
 
   final CellValue value;
   final bool isGiven;
@@ -21,41 +23,45 @@ class BoardCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final fillColor = switch (value) {
-      CellValue.zero => zeroColor,
-      CellValue.one => oneColor,
-      CellValue.empty => colorScheme.surfaceContainerHighest,
+    final backgroundColor = switch ((value, isGiven)) {
+      (CellValue.empty, _) => colorScheme.surfaceContainerHighest,
+      (_, true) => colorScheme.onSurfaceVariant,
+      (CellValue.zero, false) => zeroColor,
+      (CellValue.one, false) => oneColor,
     };
+    final digitColor = isGiven ? colorScheme.surface : Colors.white;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.all(1.5),
+        padding: EdgeInsets.all(isInViolation ? violationRingWidth : 0),
         decoration: BoxDecoration(
-          color: isGiven || value.isEmpty
-              ? fillColor
-              : fillColor.withValues(alpha: 0.7),
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(8),
           border: isInViolation
-              ? Border.all(color: colorScheme.error, width: 3)
+              ? Border.all(color: violationColor, width: violationRingWidth)
               : null,
         ),
-        alignment: Alignment.center,
-        child: value.isEmpty
-            ? null
-            : FittedBox(
-                child: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: Text(
-                    value == CellValue.zero ? '0' : '1',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: isGiven ? FontWeight.w900 : FontWeight.w400,
-                      decoration: isGiven ? TextDecoration.underline : null,
-                      decorationColor: Colors.white,
+        child: Container(
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(isInViolation ? 4 : 6),
+          ),
+          alignment: Alignment.center,
+          child: value.isEmpty
+              ? null
+              : FittedBox(
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Text(
+                      value == CellValue.zero ? '0' : '1',
+                      style: TextStyle(
+                        color: digitColor,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
-              ),
+        ),
       ),
     );
   }

@@ -29,6 +29,8 @@ class GameController extends ChangeNotifier {
 
   bool get canUndo => _previousBoards.isNotEmpty && !_isSolved;
 
+  bool get canRestart => !_isSolved && _currentBoard != puzzle.givenBoard;
+
   int get size => puzzle.size;
 
   Duration get elapsed => _elapsedBeforeThisSession + _sessionStopwatch.elapsed;
@@ -57,7 +59,7 @@ class GameController extends ChangeNotifier {
   }
 
   void restart() {
-    if (_isSolved || _currentBoard == puzzle.givenBoard) {
+    if (!canRestart) {
       return;
     }
     _previousBoards.add(_currentBoard);

@@ -62,6 +62,14 @@ void main() {
     expect(controller.currentBoard.cellAt(0, 0), CellValue.zero);
   });
 
+  test('restart is only possible after the player has made a move', () {
+    expect(controller.canRestart, isFalse);
+
+    controller.tapCell(0, 0);
+
+    expect(controller.canRestart, isTrue);
+  });
+
   test('cells that break a rule are listed as violations', () {
     controller.tapCell(0, 1);
 
