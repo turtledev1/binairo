@@ -61,4 +61,21 @@ void main() {
 
     expect(await SavedGameRepository().load(), isNull);
   });
+
+  test('fill progress counts only the cells the player had to fill', () {
+    final puzzle = fourByFourPuzzleMissingCells(const [
+      CellPosition(0, 0),
+      CellPosition(1, 1),
+      CellPosition(2, 2),
+      CellPosition(3, 3),
+    ]);
+
+    final savedGame = SavedGame(
+      puzzle: puzzle,
+      currentBoard: puzzle.givenBoard.withCell(0, 0, CellValue.zero),
+      elapsed: Duration.zero,
+    );
+
+    expect(savedGame.fillProgress, 0.25);
+  });
 }

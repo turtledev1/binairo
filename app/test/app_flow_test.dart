@@ -1,175 +1,224 @@
-import 'package:binairo_app/game/saved_game_repository.dart';
-import 'package:binairo_app/screens/new_game_screen.dart';
 import 'package:binairo_app/widgets/board_cell.dart';
 import 'package:binairo_app/widgets/celebration.dart';
 import 'package:binairo_core/binairo_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'test_puzzles.dart';
+import 'test_app.dart';
 
 void main() {
-  final puzzleMissingTwoCells = fourByFourPuzzleMissingCells(const [
-    CellPosition(0, 0),
-    CellPosition(3, 3),
-  ]);
-
-  Widget buildApp({
-    List<(int, Difficulty)>? requestedPuzzles,
-    Puzzle? puzzleToServe,
-  }) => MaterialApp(
-    home: NewGameScreen(
-      savedGameRepository: SavedGameRepository(),
-      puzzleFactory: (size, difficulty) async {
-        requestedPuzzles?.add((size, difficulty));
-        return puzzleToServe ?? puzzleMissingTwoCells;
-      },
-    ),
-  );
-
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  testWidgets('starting a game asks for the chosen size and level', (
-    tester,
-  ) async {
-    final requestedPuzzles = <(int, Difficulty)>[];
-    await tester.pumpWidget(buildApp(requestedPuzzles: requestedPuzzles));
+  group('home', () {
+    testWidgets('shows the title, new game and the three shortcuts', (
+      tester,
+    ) async {
+      await pumpBinairoApp(tester);
 
-    await tester.tap(find.text('12'));
-    await tester.tap(find.text('Hard'));
-    await tester.tap(find.text('New game'));
-    await tester.pumpAndSettle();
+      expect(find.text('Binairo'), findsOneWidget);
+      expect(find.text('New game'), findsOneWidget);
+      expect(find.text('How to play'), findsOneWidget);
+      expect(find.text('Statistics'), findsOneWidget);
+      expect(find.text('Settings'), findsOneWidget);
+      expect(find.text('Continue'), findsNothing);
+    });
 
-    expect(requestedPuzzles, [(12, Difficulty.hard)]);
-    expect(find.byKey(const ValueKey('cell-0-0')), findsOneWidget);
-  });
+    testWidgets('each shortcut opens its screen', (tester) async {
+      await pumpBinairoApp(tester);
 
-  testWidgets('tapping an empty cell shows a zero, then a one', (tester) async {
-    await tester.pumpWidget(buildApp());
-    await tester.tap(find.text('New game'));
-    await tester.pumpAndSettle();
-    final firstCell = find.byKey(const ValueKey('cell-0-0'));
+      for (final (shortcut, textOnScreen) in [
+        ('How to play', 'Rule 1 · No three in a row'),
+        ('Statistics', 'Average'),
+        ('Settings', 'Show rule errors'),
+      ]) {
+        await tester.tap(find.text(shortcut));
+        await tester.pumpAndSettle();
+        expect(find.textContaining(textOnScreen), findsWidgets);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+      }
+    });
 
-    await tester.tap(firstCell);
-    await tester.pump();
-    expect(
-      find.descendant(of: firstCell, matching: find.text('0')),
-      findsOneWidget,
+    testWidgets('starting a game asks for the chosen size and level and '
+        'remembers them for next time', (tester) async {
+      final requestedPuzzles = <(int, Difficulty)>[];
+      final services = await pumpBinairoApp(
+        tester,
+        requestedPuzzles: requestedPuzzles,
+      );
+
+      await startNewGameFromHome(
+        tester,
+        sizeLabel: '12×12',
+        levelLabel: 'Hard',
+      );
+
+      expect(requestedPuzzles, [(12, Difficulty.hard)]);
+      expect(find.byKey(const ValueKey('cell-0-0')), findsOneWidget);
+      expect(services.settingsController.settings.lastBoardSize, 12);
+      expect(
+        services.settingsController.settings.lastDifficulty,
+        Difficulty.hard,
+      );
+    });
+
+    testWidgets(
+      'leaving an unfinished game shows a continue card that resumes it',
+      (tester) async {
+        await pumpBinairoApp(tester);
+        await startNewGameFromHome(tester);
+        await tapCell(tester, 0, 0);
+
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(find.text('50%'), findsOneWidget);
+        await tester.tap(find.text('Continue'));
+        await tester.pumpAndSettle();
+
+        expect(digitInCell(0, 0, '0'), findsOneWidget);
+      },
     );
 
-    await tester.tap(firstCell);
-    await tester.pump();
-    expect(
-      find.descendant(of: firstCell, matching: find.text('1')),
-      findsOneWidget,
+    testWidgets(
+      'starting a new game over a saved one asks first and cancel keeps it',
+      (tester) async {
+        final requestedPuzzles = <(int, Difficulty)>[];
+        await pumpBinairoApp(tester, requestedPuzzles: requestedPuzzles);
+        await startNewGameFromHome(tester);
+        await tapCell(tester, 0, 0);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+
+        await startNewGameFromHome(tester);
+        expect(find.text('Start a new game?'), findsOneWidget);
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+
+        expect(requestedPuzzles, hasLength(1));
+        expect(find.text('Continue'), findsOneWidget);
+      },
     );
   });
 
-  testWidgets('filling the last cells correctly shows the solved dialog', (
-    tester,
-  ) async {
-    await tester.pumpWidget(buildApp());
-    await tester.tap(find.text('New game'));
-    await tester.pumpAndSettle();
+  group('game', () {
+    testWidgets('tapping an empty cell shows a zero, then a one', (
+      tester,
+    ) async {
+      await pumpBinairoApp(tester);
+      await startNewGameFromHome(tester);
 
-    await tester.tap(find.byKey(const ValueKey('cell-0-0')));
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('cell-3-3')));
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('cell-3-3')));
-    await tester.pumpAndSettle();
+      await tapCell(tester, 0, 0);
+      expect(digitInCell(0, 0, '0'), findsOneWidget);
 
-    expect(find.text('Solved!'), findsOneWidget);
+      await tapCell(tester, 0, 0);
+      expect(digitInCell(0, 0, '1'), findsOneWidget);
+    });
 
-    await tester.tap(find.widgetWithText(FilledButton, 'New game'));
-    await tester.pumpAndSettle();
-    expect(find.text('Size'), findsOneWidget);
-    expect(find.textContaining('Continue'), findsNothing);
-  });
+    testWidgets('restart from the menu asks first and cancel keeps the moves', (
+      tester,
+    ) async {
+      await pumpBinairoApp(tester);
+      await startNewGameFromHome(tester);
+      await tapCell(tester, 0, 0);
 
-  testWidgets('leaving an unfinished game offers to continue it', (
-    tester,
-  ) async {
-    await tester.pumpWidget(buildApp());
-    await tester.tap(find.text('New game'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('cell-0-0')));
-    await tester.pump();
+      await openGameMenuItem(tester, 'Restart');
+      expect(find.text('Restart puzzle?'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
 
-    await tester.pageBack();
-    await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('Continue'));
-    await tester.pumpAndSettle();
+      expect(digitInCell(0, 0, '0'), findsOneWidget);
+    });
 
-    final firstCell = find.byKey(const ValueKey('cell-0-0'));
-    expect(
-      find.descendant(of: firstCell, matching: find.text('0')),
-      findsOneWidget,
+    testWidgets('confirming restart from the menu clears the moves', (
+      tester,
+    ) async {
+      await pumpBinairoApp(tester);
+      await startNewGameFromHome(tester);
+      await tapCell(tester, 0, 0);
+
+      await openGameMenuItem(tester, 'Restart');
+      await tester.tap(find.widgetWithText(FilledButton, 'Restart'));
+      await tester.pumpAndSettle();
+
+      expect(digitInCell(0, 0, '0'), findsNothing);
+    });
+
+    testWidgets('the menu opens how to play and settings', (tester) async {
+      await pumpBinairoApp(tester);
+      await startNewGameFromHome(tester);
+
+      await openGameMenuItem(tester, 'How to play');
+      expect(find.text('Rule 1 · No three in a row'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await openGameMenuItem(tester, 'Settings');
+      expect(find.text('Show counters'), findsOneWidget);
+    });
+
+    testWidgets(
+      'given cells and player cells holding the same digit look different',
+      (tester) async {
+        await pumpBinairoApp(tester);
+        await startNewGameFromHome(tester);
+        await tapCell(tester, 0, 0);
+
+        Color backgroundOf(int row, int column) {
+          final tile = tester.widget<Container>(
+            find
+                .descendant(
+                  of: find.byKey(ValueKey('cell-$row-$column')),
+                  matching: find.byType(Container),
+                )
+                .last,
+          );
+          return (tile.decoration! as BoxDecoration).color!;
+        }
+
+        expect(backgroundOf(0, 0), isNot(backgroundOf(0, 2)));
+      },
     );
-  });
 
-  Future<void> openGameAndPlayFirstCell(WidgetTester tester) async {
-    await tester.pumpWidget(buildApp());
-    await tester.tap(find.text('New game'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('cell-0-0')));
-    await tester.pump();
-  }
+    testWidgets(
+      'a cell that breaks a rule gets a ring in a color no digit uses',
+      (tester) async {
+        await pumpBinairoApp(tester);
+        await startNewGameFromHome(tester);
+        await tapCell(tester, 0, 0);
+        await tapCell(tester, 0, 0);
 
-  Finder digitInFirstCell(String digit) => find.descendant(
-    of: find.byKey(const ValueKey('cell-0-0')),
-    matching: find.text(digit),
-  );
-
-  testWidgets('cancelling the restart dialog keeps the moves', (tester) async {
-    await openGameAndPlayFirstCell(tester);
-
-    await tester.tap(find.byTooltip('Restart'));
-    await tester.pumpAndSettle();
-    expect(find.text('Restart puzzle?'), findsOneWidget);
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
-
-    expect(digitInFirstCell('0'), findsOneWidget);
-  });
-
-  testWidgets('confirming the restart dialog clears the moves', (tester) async {
-    await openGameAndPlayFirstCell(tester);
-
-    await tester.tap(find.byTooltip('Restart'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Restart'));
-    await tester.pumpAndSettle();
-
-    expect(digitInFirstCell('0'), findsNothing);
-  });
-
-  testWidgets(
-    'given cells and player cells holding the same digit look different',
-    (tester) async {
-      await openGameAndPlayFirstCell(tester);
-      Color backgroundOf(String cellKey) {
-        final tile = tester.widget<Container>(
+        final ring = tester.widget<Container>(
           find
               .descendant(
-                of: find.byKey(ValueKey(cellKey)),
+                of: find.byKey(const ValueKey('cell-0-0')),
                 matching: find.byType(Container),
               )
-              .last,
+              .first,
         );
-        return (tile.decoration! as BoxDecoration).color!;
-      }
+        final ringBorder =
+            (ring.decoration! as BoxDecoration).border! as Border;
 
-      expect(backgroundOf('cell-0-0'), isNot(backgroundOf('cell-0-2')));
-    },
-  );
+        expect(ringBorder.top.color, BoardCell.violationColor);
+        expect(
+          BoardCell.violationColor,
+          isNot(anyOf(BoardCell.zeroColor, BoardCell.oneColor)),
+        );
+      },
+    );
 
-  testWidgets(
-    'a cell that breaks a rule gets a ring in a color no digit uses',
-    (tester) async {
-      await openGameAndPlayFirstCell(tester);
-      await tester.tap(find.byKey(const ValueKey('cell-0-0')));
+    testWidgets('turning off rule errors in settings removes the red ring', (
+      tester,
+    ) async {
+      final services = await pumpBinairoApp(tester);
+      await startNewGameFromHome(tester);
+      await tapCell(tester, 0, 0);
+      await tapCell(tester, 0, 0);
+
+      await services.settingsController.update(
+        (settings) => settings.copyWith(showRuleErrors: false),
+      );
       await tester.pump();
 
       final ring = tester.widget<Container>(
@@ -180,34 +229,129 @@ void main() {
             )
             .first,
       );
-      final ringBorder = (ring.decoration! as BoxDecoration).border! as Border;
+      expect((ring.decoration! as BoxDecoration).border, isNull);
+    });
 
-      expect(ringBorder.top.color, BoardCell.violationColor);
-      expect(
-        BoardCell.violationColor,
-        isNot(anyOf(BoardCell.zeroColor, BoardCell.oneColor)),
+    testWidgets('turning off counters in settings hides them', (tester) async {
+      final services = await pumpBinairoApp(tester);
+      await startNewGameFromHome(tester);
+      expect(find.byKey(const ValueKey('row-counter-0')), findsOneWidget);
+
+      await services.settingsController.update(
+        (settings) => settings.copyWith(showLineCounters: false),
       );
-    },
-  );
+      await tester.pump();
 
-  testWidgets('solving plays the celebration before the solved dialog opens', (
+      expect(find.byKey(const ValueKey('row-counter-0')), findsNothing);
+      expect(find.byKey(const ValueKey('column-counter-0')), findsNothing);
+    });
+
+    testWidgets('solving plays the celebration, then shows a first best time', (
+      tester,
+    ) async {
+      await pumpBinairoApp(tester);
+      await startNewGameFromHome(tester);
+
+      await solvePuzzleMissingTwoCells(tester);
+      await tester.pump(const Duration(milliseconds: 500));
+      final poppingCells = find.descendant(
+        of: find.byType(CelebrationWave),
+        matching: find.byType(Transform),
+      );
+      expect(poppingCells, findsWidgets);
+      expect(find.text('Solved!'), findsNothing);
+
+      await tester.pumpAndSettle();
+      expect(find.text('Solved!'), findsOneWidget);
+      expect(find.textContaining('New best time'), findsOneWidget);
+    });
+
+    testWidgets(
+      'after solving, home has no continue card and statistics count the solve',
+      (tester) async {
+        final services = await pumpBinairoApp(tester);
+        await startNewGameFromHome(tester);
+        await solvePuzzleMissingTwoCells(tester);
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.widgetWithText(FilledButton, 'Home'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Continue'), findsNothing);
+        final statistics = await services.statisticsRepository.load(
+          4,
+          Difficulty.easy,
+        );
+        expect(statistics.solvedCount, 1);
+      },
+    );
+  });
+
+  testWidgets('choosing dark theme in settings changes the app theme', (
     tester,
   ) async {
-    await openGameAndPlayFirstCell(tester);
-    await tester.tap(find.byKey(const ValueKey('cell-3-3')));
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('cell-3-3')));
-    await tester.pump();
-
-    await tester.pump(const Duration(milliseconds: 500));
-    final poppingCells = find.descendant(
-      of: find.byType(CelebrationWave),
-      matching: find.byType(Transform),
-    );
-    expect(poppingCells, findsWidgets);
-    expect(find.text('Solved!'), findsNothing);
-
+    await pumpBinairoApp(tester);
+    await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
-    expect(find.text('Solved!'), findsOneWidget);
+
+    await tester.tap(find.text('Dark'));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
+      ThemeMode.dark,
+    );
+  });
+
+  group('tap feedback', () {
+    late List<String> hapticTypes;
+
+    setUp(() {
+      hapticTypes = [];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            if (call.method == 'HapticFeedback.vibrate') {
+              hapticTypes.add(call.arguments as String);
+            }
+            return null;
+          });
+    });
+
+    tearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+
+    testWidgets('tapping a cell you can change gives one keyboard-like buzz', (
+      tester,
+    ) async {
+      await pumpBinairoApp(tester);
+      await startNewGameFromHome(tester);
+
+      await tapCell(tester, 0, 0);
+
+      expect(hapticTypes, ['HapticFeedbackType.mediumImpact']);
+    });
+
+    testWidgets('tapping a locked clue cell gives no buzz', (tester) async {
+      await pumpBinairoApp(tester);
+      await startNewGameFromHome(tester);
+
+      await tapCell(tester, 1, 1);
+
+      expect(hapticTypes, isEmpty);
+    });
+
+    testWidgets('turning vibration off stops the tap buzz', (tester) async {
+      final services = await pumpBinairoApp(tester);
+      await services.settingsController.update(
+        (settings) => settings.copyWith(vibrationEnabled: false),
+      );
+      await startNewGameFromHome(tester);
+
+      await tapCell(tester, 0, 0);
+
+      expect(hapticTypes, isEmpty);
+    });
   });
 }

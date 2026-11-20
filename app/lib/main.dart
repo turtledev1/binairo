@@ -1,31 +1,21 @@
 import 'package:flutter/material.dart';
 
+import 'app/app_services.dart';
+import 'app/binairo_app.dart';
 import 'game/saved_game_repository.dart';
-import 'screens/new_game_screen.dart';
+import 'settings/settings_controller.dart';
+import 'statistics/statistics_repository.dart';
 
-void main() {
-  runApp(BinairoApp(savedGameRepository: SavedGameRepository()));
-}
-
-class BinairoApp extends StatelessWidget {
-  const BinairoApp({super.key, required this.savedGameRepository});
-
-  final SavedGameRepository savedGameRepository;
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Binairo',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3D7DD8)),
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final settingsController = await SettingsController.load();
+  runApp(
+    BinairoApp(
+      services: AppServices(
+        savedGameRepository: SavedGameRepository(),
+        statisticsRepository: StatisticsRepository(),
+        settingsController: settingsController,
       ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF3D7DD8),
-          brightness: Brightness.dark,
-        ),
-      ),
-      home: NewGameScreen(savedGameRepository: savedGameRepository),
-    );
-  }
+    ),
+  );
 }

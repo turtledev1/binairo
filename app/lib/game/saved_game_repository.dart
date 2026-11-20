@@ -11,6 +11,14 @@ class SavedGame {
   final Puzzle puzzle;
   final Board currentBoard;
   final Duration elapsed;
+
+  double get fillProgress {
+    final cellsToFill =
+        puzzle.size * puzzle.size - puzzle.givenBoard.filledCellCount;
+    final cellsFilledByPlayer =
+        currentBoard.filledCellCount - puzzle.givenBoard.filledCellCount;
+    return cellsToFill == 0 ? 1 : cellsFilledByPlayer / cellsToFill;
+  }
 }
 
 class SavedGameRepository {

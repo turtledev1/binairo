@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../app/app_services.dart';
 import '../game/game_controller.dart';
+import '../game/game_options.dart';
 import '../game/saved_game_repository.dart';
 import '../widgets/board_grid.dart';
 import '../widgets/celebration.dart';
+import 'how_to_play_screen.dart';
+import 'settings_screen.dart';
+
+enum _GameMenuAction { restart, howToPlay, settings }
 
 class GameScreen extends StatefulWidget {
-  const GameScreen({
-    super.key,
-    required this.controller,
-    required this.savedGameRepository,
-  });
+  const GameScreen({super.key, required this.controller});
 
   final GameController controller;
-  final SavedGameRepository savedGameRepository;
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -29,6 +30,7 @@ class _GameScreenState extends State<GameScreen>
     vsync: this,
     duration: celebrationDuration,
   );
+  AppServices? _services;
   bool _hasCelebrated = false;
 
   GameController get _controller => widget.controller;
@@ -38,7 +40,16 @@ class _GameScreenState extends State<GameScreen>
     super.initState();
     _controller.addListener(_onGameChanged);
     _appLifecycleListener = AppLifecycleListener(onPause: _saveProgress);
-    _saveProgress();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final isFirstDependencyChange = _services == null;
+    _services = AppScope.of(context);
+    if (isFirstDependencyChange) {
+      _saveProgress();
+    }
   }
 
   @override
@@ -60,19 +71,30 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Future<void> _celebrateThenShowSolvedDialog() async {
-    HapticFeedback.heavyImpact();
+    final services = _services!;
+    final solveTime = _controller.elapsed;
+    final isNewBestTime = services.statisticsRepository.recordSolve(
+      _controller.size,
+      _controller.puzzle.difficulty,
+      solveTime,
+    );
+    if (services.settingsController.settings.vibrationEnabled) {
+      HapticFeedback.heavyImpact();
+    }
     await _celebrationController.forward();
     if (mounted) {
-      await _showSolvedDialog();
+      await _showSolvedDialog(solveTime, await isNewBestTime);
     }
   }
 
   void _saveProgress() {
+    final savedGameRepository = _services?.savedGameRepository;
+    if (savedGameRepository == null) return;
     if (_controller.isSolved) {
-      widget.savedGameRepository.clear();
+      savedGameRepository.clear();
       return;
     }
-    widget.savedGameRepository.save(
+    savedGameRepository.save(
       SavedGame(
         puzzle: _controller.puzzle,
         currentBoard: _controller.currentBoard,
@@ -81,12 +103,22 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  Future<void> _showSolvedDialog() async {
+  Future<void> _showSolvedDialog(Duration solveTime, bool isNewBestTime) async {
+    if (!mounted) return;
     final startNewGame = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        icon: Icon(
+          isNewBestTime ? Icons.emoji_events : Icons.check_circle,
+          size: 48,
+        ),
         title: const Text('Solved!'),
-        content: Text('Time: ${formatElapsedTime(_controller.elapsed)}'),
+        content: Text(
+          isNewBestTime
+              ? 'New best time: ${formatElapsedTime(solveTime)}'
+              : 'Time: ${formatElapsedTime(solveTime)}',
+          textAlign: TextAlign.center,
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -94,7 +126,7 @@ class _GameScreenState extends State<GameScreen>
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('New game'),
+            child: const Text('Home'),
           ),
         ],
       ),
@@ -127,11 +159,27 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
+  void _onMenuSelected(_GameMenuAction action) {
+    switch (action) {
+      case _GameMenuAction.restart:
+        _confirmRestart();
+      case _GameMenuAction.howToPlay:
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const HowToPlayScreen()),
+        );
+      case _GameMenuAction.settings:
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen()));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final puzzle = _controller.puzzle;
+    final settingsController = AppScope.of(context).settingsController;
     return ListenableBuilder(
-      listenable: _controller,
+      listenable: Listenable.merge([_controller, settingsController]),
       builder: (context, _) => Scaffold(
         appBar: AppBar(
           title: Text(
@@ -143,10 +191,33 @@ class _GameScreenState extends State<GameScreen>
               icon: const Icon(Icons.undo),
               onPressed: _controller.canUndo ? _controller.undo : null,
             ),
-            IconButton(
-              tooltip: 'Restart',
-              icon: const Icon(Icons.restart_alt),
-              onPressed: _controller.canRestart ? _confirmRestart : null,
+            PopupMenuButton<_GameMenuAction>(
+              tooltip: 'Menu',
+              onSelected: _onMenuSelected,
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: _GameMenuAction.restart,
+                  enabled: _controller.canRestart,
+                  child: const ListTile(
+                    leading: Icon(Icons.restart_alt),
+                    title: Text('Restart'),
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: _GameMenuAction.howToPlay,
+                  child: ListTile(
+                    leading: Icon(Icons.school_outlined),
+                    title: Text('How to play'),
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: _GameMenuAction.settings,
+                  child: ListTile(
+                    leading: Icon(Icons.settings_outlined),
+                    title: Text('Settings'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -159,6 +230,11 @@ class _GameScreenState extends State<GameScreen>
                   child: BoardGrid(
                     controller: _controller,
                     celebration: _celebrationController,
+                    showRuleErrors: settingsController.settings.showRuleErrors,
+                    showLineCounters:
+                        settingsController.settings.showLineCounters,
+                    tapFeedbackEnabled:
+                        settingsController.settings.vibrationEnabled,
                   ),
                 ),
                 Positioned.fill(
@@ -172,12 +248,3 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 }
-
-String formatElapsedTime(Duration elapsed) {
-  final minutes = elapsed.inMinutes;
-  final seconds = (elapsed.inSeconds % 60).toString().padLeft(2, '0');
-  return '$minutes:$seconds';
-}
-
-String capitalize(String word) =>
-    word.isEmpty ? word : word[0].toUpperCase() + word.substring(1);
