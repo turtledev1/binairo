@@ -1,0 +1,9 @@
+name: binairo_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.12.0
+
+workspace:
+  - packages/binairo_core
+  - app

@@ -1,0 +1,24 @@
+name: binairo_app
+description: Play Binairo puzzles on your phone.
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.0
+
+resolution: workspace
+
+dependencies:
+  binairo_core:
+    path: ../packages/binairo_core
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.5.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

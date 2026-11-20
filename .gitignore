@@ -1,2 +1,6 @@
-node_modules
-build
+.dart_tool/
+build/
+.packages
+*.iml
+.idea/
+.DS_Store
