@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../game/game_controller.dart';
 import '../game/saved_game_repository.dart';
 import '../widgets/board_grid.dart';
+import '../widgets/celebration.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({
@@ -18,9 +20,16 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> {
+class _GameScreenState extends State<GameScreen>
+    with SingleTickerProviderStateMixin {
+  static const Duration celebrationDuration = Duration(milliseconds: 1800);
+
   late final AppLifecycleListener _appLifecycleListener;
-  bool _hasShownSolvedDialog = false;
+  late final AnimationController _celebrationController = AnimationController(
+    vsync: this,
+    duration: celebrationDuration,
+  );
+  bool _hasCelebrated = false;
 
   GameController get _controller => widget.controller;
 
@@ -36,6 +45,7 @@ class _GameScreenState extends State<GameScreen> {
   void dispose() {
     _saveProgress();
     _appLifecycleListener.dispose();
+    _celebrationController.dispose();
     _controller.removeListener(_onGameChanged);
     _controller.dispose();
     super.dispose();
@@ -43,9 +53,17 @@ class _GameScreenState extends State<GameScreen> {
 
   void _onGameChanged() {
     _saveProgress();
-    if (_controller.isSolved && !_hasShownSolvedDialog) {
-      _hasShownSolvedDialog = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _showSolvedDialog());
+    if (_controller.isSolved && !_hasCelebrated) {
+      _hasCelebrated = true;
+      _celebrateThenShowSolvedDialog();
+    }
+  }
+
+  Future<void> _celebrateThenShowSolvedDialog() async {
+    HapticFeedback.heavyImpact();
+    await _celebrationController.forward();
+    if (mounted) {
+      await _showSolvedDialog();
     }
   }
 
@@ -135,7 +153,19 @@ class _GameScreenState extends State<GameScreen> {
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(8),
-            child: Center(child: BoardGrid(controller: _controller)),
+            child: Stack(
+              children: [
+                Center(
+                  child: BoardGrid(
+                    controller: _controller,
+                    celebration: _celebrationController,
+                  ),
+                ),
+                Positioned.fill(
+                  child: ConfettiOverlay(celebration: _celebrationController),
+                ),
+              ],
+            ),
           ),
         ),
       ),

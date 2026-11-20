@@ -1,6 +1,7 @@
 import 'package:binairo_app/game/saved_game_repository.dart';
 import 'package:binairo_app/screens/new_game_screen.dart';
 import 'package:binairo_app/widgets/board_cell.dart';
+import 'package:binairo_app/widgets/celebration.dart';
 import 'package:binairo_core/binairo_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -188,4 +189,25 @@ void main() {
       );
     },
   );
+
+  testWidgets('solving plays the celebration before the solved dialog opens', (
+    tester,
+  ) async {
+    await openGameAndPlayFirstCell(tester);
+    await tester.tap(find.byKey(const ValueKey('cell-3-3')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('cell-3-3')));
+    await tester.pump();
+
+    await tester.pump(const Duration(milliseconds: 500));
+    final poppingCells = find.descendant(
+      of: find.byType(CelebrationWave),
+      matching: find.byType(Transform),
+    );
+    expect(poppingCells, findsWidgets);
+    expect(find.text('Solved!'), findsNothing);
+
+    await tester.pumpAndSettle();
+    expect(find.text('Solved!'), findsOneWidget);
+  });
 }

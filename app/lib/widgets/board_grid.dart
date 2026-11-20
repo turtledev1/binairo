@@ -5,13 +5,19 @@ import 'package:flutter/material.dart';
 
 import '../game/game_controller.dart';
 import 'board_cell.dart';
+import 'celebration.dart';
 
 /// The board, with a column of row counters on the right and a row of
 /// column counters at the bottom. Each counter shows zeros and ones left.
 class BoardGrid extends StatelessWidget {
-  const BoardGrid({super.key, required this.controller});
+  const BoardGrid({
+    super.key,
+    required this.controller,
+    this.celebration = kAlwaysDismissedAnimation,
+  });
 
   final GameController controller;
+  final Animation<double> celebration;
 
   @override
   Widget build(BuildContext context) {
@@ -33,14 +39,22 @@ class BoardGrid extends StatelessWidget {
                       for (var column = 0; column < size; column++)
                         SizedBox.square(
                           dimension: slotSize,
-                          child: BoardCell(
-                            key: ValueKey('cell-$row-$column'),
-                            value: controller.currentBoard.cellAt(row, column),
-                            isGiven: controller.isGivenCell(row, column),
-                            isInViolation: controller.cellsInViolation.contains(
-                              CellPosition(row, column),
+                          child: CelebrationWave(
+                            celebration: celebration,
+                            row: row,
+                            column: column,
+                            boardSize: size,
+                            child: BoardCell(
+                              key: ValueKey('cell-$row-$column'),
+                              value: controller.currentBoard.cellAt(
+                                row,
+                                column,
+                              ),
+                              isGiven: controller.isGivenCell(row, column),
+                              isInViolation: controller.cellsInViolation
+                                  .contains(CellPosition(row, column)),
+                              onTap: () => controller.tapCell(row, column),
                             ),
-                            onTap: () => controller.tapCell(row, column),
                           ),
                         ),
                       SizedBox.square(
